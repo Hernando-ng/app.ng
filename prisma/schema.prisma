@@ -1,0 +1,133 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model User {
+  id                String          @id @default(uuid())
+  name              String?
+  email             String?         @unique
+  phone             String?         @unique
+  passwordHash      String
+  image             String?
+  bio               String?         @default("Hey there! I am using app.ng.")
+  isPhoneVerified   Boolean         @default(false)
+  isBusiness        Boolean         @default(false)
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+
+  businessProfile   BusinessProfile?
+  privacySettings   PrivacySettings?
+  memberships       ConversationMember[]
+  sentMessages      Message[]       @relation("SenderMessages")
+  messageReceipts   MessageReceipt[]
+  deletedMessages   MessageDelete[]
+}
+
+model BusinessProfile {
+  id             String   @id @default(uuid())
+  userId         String   @unique
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  businessName   String
+  category       String
+  description    String?
+  operatingHours String?
+  contactEmail   String?
+  contactPhone   String?
+  website        String?
+  address        String?
+  isVerified     Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+model PrivacySettings {
+  id                   String   @id @default(uuid())
+  userId               String   @unique
+  user                 User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  profileVisibility    String   @default("EVERYONE") // EVERYONE, CONTACTS, NOBODY
+  lastSeenVisibility   String   @default("EVERYONE") // EVERYONE, CONTACTS, NOBODY
+  readReceiptsEnabled  Boolean  @default(true)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+}
+
+model Conversation {
+  id          String               @id @default(uuid())
+  isGroup     Boolean              @default(false)
+  name        String?
+  groupImage  String?
+  description String?
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
+
+  members     ConversationMember[]
+  messages    Message[]
+}
+
+model ConversationMember {
+  id             String       @id @default(uuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  isAdmin        Boolean      @default(false)
+  joinedAt       DateTime     @default(now())
+
+  @@unique([conversationId, userId])
+}
+
+model Message {
+  id             String         @id @default(uuid())
+  conversationId String
+  conversation   Conversation   @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  senderId       String
+  sender         User           @relation("SenderMessages", fields: [senderId], references: [id], onDelete: Cascade)
+  content        String?
+  mediaUrl       String?
+  mediaType      String?        // IMAGE, VIDEO, AUDIO, DOCUMENT
+  fileName       String?
+  fileSize       Int?
+
+  replyToId      String?
+  replyTo        Message?       @relation("MessageReplies", fields: [replyToId], references: [id], onDelete: SetNull)
+  replies        Message[]      @relation("MessageReplies")
+
+  isForwarded    Boolean        @default(false)
+  isEdited       Boolean        @default(false)
+  deletedForEveryone Boolean    @default(false)
+
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  receipts       MessageReceipt[]
+  deletedFor     MessageDelete[]
+}
+
+model MessageReceipt {
+  id        String    @id @default(uuid())
+  messageId String
+  message   Message   @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  status    String    @default("DELIVERED") // DELIVERED, READ
+  readAt    DateTime?
+  updatedAt DateTime  @updatedAt
+
+  @@unique([messageId, userId])
+}
+
+model MessageDelete {
+  id        String   @id @default(uuid())
+  messageId String
+  message   Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([messageId, userId])
+}
